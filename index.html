@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Генератор примеров для Абакуса</title>
+    <style>
+        /* Общие стили для экрана */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            max-width: 600px;
+            margin: 0 auto 30px auto;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: inline-block;
+            width: 200px;
+            font-weight: bold;
+        }
+        input, select {
+            padding: 6px 10px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 100px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .btn-gen { background-color: #2ecc71; color: white; }
+        .btn-print { background-color: #3498db; color: white; }
+        
+        /* Стили для сетки с примерами */
+        .sheet {
+            background: white;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr); /* 5 колонок в ряд */
+            gap: 20px;
+        }
+        .card {
+            border: 2px solid #333;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            background: #fff;
+        }
+        .card-title {
+            font-size: 14px;
+            color: #666;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        .row-num {
+            margin: 5px 0;
+            min-height: 30px;
+        }
+        .answer-line {
+            border-top: 2px dashed #333;
+            margin-top: 15px;
+            padding-top: 10px;
+            min-height: 35px;
+        }
+        .answer {
+            color: #e74c3c;
+            font-size: 18px;
+        }
+        
+        /* Скрытие ответов на экране (по желанию, можно включить) */
+        .hide-answers .answer {
+            display: none;
+        }
+
+        /* НАСТРОЙКИ ДЛЯ ПЕЧАТИ */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .controls {
+                display: none; /* Прячем пульт управления при печати */
+            }
+            .sheet {
+                max-width: 100%;
+                padding: 0;
+                grid-template-columns: repeat(5, 1fr); /* Жестко 5 колонок на листе А4 */
+            }
+            .card {
+                page-break-inside: avoid; /* Чтобы карточки не рвались между страницами */
+                border: 1px solid #000;
+            }
+            /* Если нужно распечатать БЕЗ ответов, раскомментируй строку ниже: */
+            /* .answer { display: none !important; } */
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Пульт управления -->
+    <div class="controls">
+        <h2>Настройки тренажера</h2>
+        <div class="control-group">
+            <label>Разрядность (числа):</label>
+            <select id="digits">
+                <option value="1">Однозначные (1-9)</option>
+                <option value="2">Двузначные (10-99)</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Количество строк:</label>
+            <input type="number" id="rows" value="4" min="2" max="10">
+        </div>
+        <div class="control-group">
+            <label>Сколько примеров (всего):</label>
+            <input type="number" id="count" value="15" min="1" max="50">
+        </div>
+        <div class="control-group">
+            <label>Показывать ответы?</label>
+            <input type="checkbox" id="showAnswers" checked style="width: auto;">
+        </div>
+        <button class="btn-gen" onclick="generateSheet()">Сгенерировать</button>
+        <button class="btn-print" onclick="window.print()">Печать</button>
+    </div>
+
+    <!-- Область для печати -->
+    <div id="sheet" class="sheet"></div>
+
+    <script>
+        // Функция генерации одного "простого" примера
+        function generateExample(digits, rows) {
+            while (true) {
+                let example = [];
+                // Генерируем стартовые цифры для каждого разряда
+                let currentResDigits = [];
+                for (let i = 0; i < digits; i++) {
+                    currentResDigits.push(Math.floor(Math.random() * 9) + 1);
+                }
+                
+                // Переводим массив цифр в стартовое число
+                example.append = intFromDigits(currentResDigits);
+                let sequence = [example.append];
+                
+                let success = true;
+                
+                for (let r = 0; r < rows - 1; r++) {
+                    let sign = Math.random() > 0.5 ? 1 : -1;
+                    let nextNumDigits = [];
+                    
+                    for (let i = 0; i < digits; i++) {
+                        let currentDigit = currentResDigits[i];
+                        let possible = [];
+                        
+                        // Ищем только те цифры, которые можно набрать БЕЗ формул
+                        for (let d = 0; d <= 9; d++) {
+                            if (sign === 1 && currentDigit + d <= 9) possible.push(d);
+                            if (sign === -1 && currentDigit - d >= 0) possible.push(d);
+                        }
+                        
+                        if (possible.length === 0) { success = false; break; }
+                        nextNumDigits.push(possible[Math.floor(Math.random() * possible.length)]);
+                    }
+                    
+                    let nextNum = intFromDigits(nextNumDigits);
+                    if (nextNum === 0 || !success) { success = false; break; }
+                    
+                    // Считаем новое состояние абакуса
+                    for (let i = 0; i < digits; i++) {
+                        currentResDigits[i] += nextNumDigits[i] * sign;
+                    }
+                    
+                    sequence.push(nextNum * sign);
+                }
+                
+                // Проверяем финальный ответ, чтобы не был равен 0
+                let finalSum = sequence.reduce((a, b) => a + b, 0);
+                if (success && finalSum !== 0) {
+                    return { sequence: sequence, answer: finalSum };
+                }
+            }
+        }
+
+        function intFromDigits(arr) {
+            return parseInt(arr.join(''));
+        }
+
+        // Основная функция отрисовки
+        function generateSheet() {
+            const digits = parseInt(document.getElementById('digits').value);
+            const rows = parseInt(document.getElementById('rows').value);
+            const count = parseInt(document.getElementById('count').value);
+            const showAnswers = document.getElementById('showAnswers').checked;
+            
+            const sheet = document.getElementById('sheet');
+            sheet.innerHTML = ''; // Очищаем старое
+            
+            if (showAnswers) {
+                sheet.classList.remove('hide-answers');
+            } else {
+                sheet.classList.add('hide-answers');
+            }
+
+            for (let i = 1; i <= count; i++) {
+                let ex = generateExample(digits, rows);
+                
+                let card = document.createElement('div');
+                card.className = 'card';
+                
+                let html = `<div class="card-title">Пример №${i}</div>`;
+                
+                ex.sequence.forEach((num, index) => {
+                    // Первое число пишем без знака, остальные со знаком + или -
+                    if (index === 0) {
+                        html += `<div class="row-num">${num}</div>`;
+                    } else {
+                        let signStr = num > 0 ? `+${num}` : `${num}`;
+                        html += `<div class="row-num">${signStr}</div>`;
+                    }
+                });
+                
+                html += `<div class="answer-line"><span class="answer">${ex.answer}</span></div>`;
+                card.innerHTML = html;
+                sheet.appendChild(card);
+            }
+        }
+
+        // Генерируем первый сет сразу при загрузке страницы
+        window.onload = generateSheet;
+    </script>
+</body>
+</html>
