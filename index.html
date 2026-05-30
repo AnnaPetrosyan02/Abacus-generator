@@ -33,7 +33,7 @@
             font-size: 14px;
             border: 1px solid #ccc;
             border-radius: 4px;
-            width: 100px;
+            width: 180px; /* Немного увеличил ширину для красивого отображения */
         }
         button {
             padding: 10px 20px;
@@ -87,7 +87,7 @@
             font-size: 18px;
         }
         
-        /* Скрытие ответов на экране (по желанию, можно включить) */
+        /* Скрытие ответов на экране */
         .hide-answers .answer {
             display: none;
         }
@@ -99,25 +99,22 @@
                 padding: 0;
             }
             .controls {
-                display: none; /* Прячем пульт управления при печати */
+                display: none; 
             }
             .sheet {
                 max-width: 100%;
                 padding: 0;
-                grid-template-columns: repeat(5, 1fr); /* Жестко 5 колонок на листе А4 */
+                grid-template-columns: repeat(5, 1fr); 
             }
             .card {
-                page-break-inside: avoid; /* Чтобы карточки не рвались между страницами */
+                page-break-inside: avoid; 
                 border: 1px solid #000;
             }
-            /* Если нужно распечатать БЕЗ ответов, раскомментируй строку ниже: */
-            /* .answer { display: none !important; } */
         }
     </style>
 </head>
 <body>
 
-    <!-- Пульт управления -->
     <div class="controls">
         <h2>Настройки тренажера</h2>
         <div class="control-group">
@@ -125,7 +122,7 @@
             <select id="digits">
                 <option value="1">Однозначные (1-9)</option>
                 <option value="2">Двузначные (10-99)</option>
-            </select>
+                <option value="3">Трехзначные (100-999)</option> </select>
         </div>
         <div class="control-group">
             <label>Количество строк:</label>
@@ -143,24 +140,28 @@
         <button class="btn-print" onclick="window.print()">Печать</button>
     </div>
 
-    <!-- Область для печати -->
     <div id="sheet" class="sheet"></div>
 
     <script>
-        // Функция генерации одного "простого" примера
+        function intFromDigits(arr) {
+            return parseInt(arr.join(''), 10);
+        }
+
+        // Функция генерации одного "простого" примера БЕЗ перехода через разряд
         function generateExample(digits, rows) {
             while (true) {
-                let example = [];
-                // Генерируем стартовые цифры для каждого разряда
                 let currentResDigits = [];
-                for (let i = 0; i < digits; i++) {
-                    currentResDigits.push(Math.floor(Math.random() * 9) + 1);
+                
+                // Первая цифра старшего разряда не должна быть нулем
+                currentResDigits.push(Math.floor(Math.random() * 9) + 1);
+                
+                // Остальные цифры для стартового числа
+                for (let i = 1; i < digits; i++) {
+                    currentResDigits.push(Math.floor(Math.random() * 10));
                 }
                 
-                // Переводим массив цифр в стартовое число
-                example.append = intFromDigits(currentResDigits);
-                let sequence = [example.append];
-                
+                let startNum = intFromDigits(currentResDigits);
+                let sequence = [startNum];
                 let success = true;
                 
                 for (let r = 0; r < rows - 1; r++) {
@@ -171,7 +172,7 @@
                         let currentDigit = currentResDigits[i];
                         let possible = [];
                         
-                        // Ищем только те цифры, которые можно набрать БЕЗ формул
+                        // Ищем цифры для простого счета на спицах абакуса
                         for (let d = 0; d <= 9; d++) {
                             if (sign === 1 && currentDigit + d <= 9) possible.push(d);
                             if (sign === -1 && currentDigit - d >= 0) possible.push(d);
@@ -181,10 +182,18 @@
                         nextNumDigits.push(possible[Math.floor(Math.random() * possible.length)]);
                     }
                     
-                    let nextNum = intFromDigits(nextNumDigits);
-                    if (nextNum === 0 || !success) { success = false; break; }
+                    if (!success) break;
                     
-                    // Считаем новое состояние абакуса
+                    let nextNum = intFromDigits(nextNumDigits);
+                    
+                    // Чтобы не было прибавления или вычитания чистого нуля (например +000)
+                    if (nextNum === 0) { success = false; break; }
+                    
+                    // Также следим, чтобы первая цифра нового числа не вела к искусственному уменьшению разрядности
+                    // (например, для трехзначных нельзя вычитать/прибавлять числа, где все нули, кроме единиц)
+                    // Но на абакусе считают по спицам, так что это допустимо, если это не ломает логику.
+                    
+                    // Обновляем состояние виртуального абакуса
                     for (let i = 0; i < digits; i++) {
                         currentResDigits[i] += nextNumDigits[i] * sign;
                     }
@@ -192,27 +201,25 @@
                     sequence.push(nextNum * sign);
                 }
                 
-                // Проверяем финальный ответ, чтобы не был равен 0
+                // Финальный ответ
                 let finalSum = sequence.reduce((a, b) => a + b, 0);
-                if (success && finalSum !== 0) {
+                
+                // Проверяем, что пример сгенерировался корректно и ответ не равен нулю
+                if (success && finalSum !== 0 && finalSum > 0) {
                     return { sequence: sequence, answer: finalSum };
                 }
             }
         }
 
-        function intFromDigits(arr) {
-            return parseInt(arr.join(''));
-        }
-
         // Основная функция отрисовки
         function generateSheet() {
-            const digits = parseInt(document.getElementById('digits').value);
-            const rows = parseInt(document.getElementById('rows').value);
-            const count = parseInt(document.getElementById('count').value);
+            const digits = parseInt(document.getElementById('digits').value, 10);
+            const rows = parseInt(document.getElementById('rows').value, 10);
+            const count = parseInt(document.getElementById('count').value, 10);
             const showAnswers = document.getElementById('showAnswers').checked;
             
             const sheet = document.getElementById('sheet');
-            sheet.innerHTML = ''; // Очищаем старое
+            sheet.innerHTML = ''; 
             
             if (showAnswers) {
                 sheet.classList.remove('hide-answers');
@@ -229,7 +236,6 @@
                 let html = `<div class="card-title">Пример №${i}</div>`;
                 
                 ex.sequence.forEach((num, index) => {
-                    // Первое число пишем без знака, остальные со знаком + или -
                     if (index === 0) {
                         html += `<div class="row-num">${num}</div>`;
                     } else {
@@ -244,8 +250,9 @@
             }
         }
 
-        // Генерируем первый сет сразу при загрузке страницы
         window.onload = generateSheet;
     </script>
 </body>
 </html>
+
+```
